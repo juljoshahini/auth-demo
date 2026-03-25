@@ -1,16 +1,9 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "auth-demo",
-	"main": ".open-next/worker.js",
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "auth-demo-scheduler",
+	"main": "src/index.ts",
 	"compatibility_date": "2026-03-17",
 	"compatibility_flags": ["nodejs_compat"],
-	"assets": {
-		"directory": ".open-next/assets",
-		"binding": "ASSETS"
-	},
-	"observability": {
-		"enabled": true
-	},
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -22,9 +15,14 @@
 		"bindings": [
 			{
 				"name": "POST_SCHEDULER",
-				"class_name": "PostScheduler",
-				"script_name": "auth-demo-scheduler"
+				"class_name": "PostScheduler"
 			}
 		]
-	}
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_classes": ["PostScheduler"]
+		}
+	]
 }
