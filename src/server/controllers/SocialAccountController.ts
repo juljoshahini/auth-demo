@@ -140,7 +140,8 @@ export async function connectAccount(c: Context<AppEnv>) {
 			platformUsername: data.platformUsername ?? null,
 		});
 	} catch (err: unknown) {
-		if (err instanceof Error && err.message.includes("UNIQUE")) {
+		const message = err instanceof Error ? err.message : String(err);
+		if (message.includes("UNIQUE")) {
 			return c.json({ error: "This account is already connected" }, 409);
 		}
 		throw err;
