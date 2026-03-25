@@ -71,7 +71,7 @@ export const organizationInviteTable = sqliteTable("organization_invite", {
 export const socialAccountTable = sqliteTable("social_account", {
 	id: text("id").primaryKey(),
 	userId: text("user_id", { length: 15 }).notNull().references(() => userTable.id),
-	orgId: text("org_id").references(() => organizationTable.id),
+	orgId: text("org_id").notNull().references(() => organizationTable.id),
 	platform: text("platform").notNull(),
 	platformAccountId: text("platform_account_id").notNull(),
 	platformUsername: text("platform_username"),
@@ -82,13 +82,13 @@ export const socialAccountTable = sqliteTable("social_account", {
 }, (table) => [
 	index("idx_social_user").on(table.userId),
 	index("idx_social_org").on(table.orgId),
-	uniqueIndex("idx_social_platform_account").on(table.userId, table.platform, table.platformAccountId),
+	uniqueIndex("idx_social_platform_account").on(table.orgId, table.platform, table.platformAccountId),
 ]);
 
 export const postTable = sqliteTable("post", {
 	id: text("id").primaryKey(),
 	userId: text("user_id", { length: 15 }).notNull().references(() => userTable.id),
-	orgId: text("org_id").references(() => organizationTable.id),
+	orgId: text("org_id").notNull().references(() => organizationTable.id),
 	content: text("content").notNull(),
 	mediaUrls: text("media_urls"),
 	scheduledAt: integer("scheduled_at").notNull(),
