@@ -66,7 +66,7 @@ export const postTable = sqliteTable("post", {
 export const postTargetTable = sqliteTable("post_target", {
 	id: integer("id").primaryKey({ autoIncrement: true }),
 	postId: text("post_id").notNull().references(() => postTable.id),
-	socialAccountId: text("social_account_id").notNull().references(() => socialAccountTable.id),
+	socialAccountId: text("social_account_id").references(() => socialAccountTable.id, { onDelete: "set null" }),
 	platformPostId: text("platform_post_id"),
 	status: text("status").notNull().default("pending"),
 	error: text("error"),

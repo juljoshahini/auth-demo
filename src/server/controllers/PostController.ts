@@ -136,7 +136,7 @@ export async function getPost(c: Context<AppEnv>) {
 			platformUsername: socialAccountTable.platformUsername,
 		})
 		.from(postTargetTable)
-		.innerJoin(socialAccountTable, eq(postTargetTable.socialAccountId, socialAccountTable.id))
+		.leftJoin(socialAccountTable, eq(postTargetTable.socialAccountId, socialAccountTable.id))
 		.where(eq(postTargetTable.postId, postId));
 
 	return c.json({ ...post, targets });

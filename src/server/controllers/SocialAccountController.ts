@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Context } from "hono";
-import { eq, and } from "drizzle-orm";
-import { socialAccountTable } from "../db/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { socialAccountTable, postTargetTable, postTable } from "../db/schema";
 import { verifyCredentials } from "../platforms/bluesky";
 import type { AppEnv } from "../types";
 
@@ -162,6 +162,31 @@ export async function disconnectAccount(c: Context<AppEnv>) {
 	if (!account) {
 		return c.json({ error: "Account not found" }, 404);
 	}
+
+	// Block if there are scheduled/pending posts using this account
+	const pendingTargets = await db
+		.select({ id: postTargetTable.id })
+		.from(postTargetTable)
+		.innerJoin(postTable, eq(postTargetTable.postId, postTable.id))
+		.where(
+			and(
+				eq(postTargetTable.socialAccountId, id),
+				inArray(postTable.status, ["scheduled", "pending"]),
+			),
+		);
+
+	if (pendingTargets.length > 0) {
+		return c.json(
+			{ error: "Cannot disconnect account with scheduled posts. Cancel them first." },
+			409,
+		);
+	}
+
+	// Nullify socialAccountId on completed/failed post targets
+	await db
+		.update(postTargetTable)
+		.set({ socialAccountId: null })
+		.where(eq(postTargetTable.socialAccountId, id));
 
 	await db
 		.delete(socialAccountTable)

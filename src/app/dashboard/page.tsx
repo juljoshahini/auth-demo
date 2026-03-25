@@ -73,9 +73,13 @@ export default function DashboardPage() {
 	}
 
 	async function handleDisconnect(id: string) {
-		await accounts.disconnect(id);
-		setSocialAccounts((prev) => prev.filter((a) => a.id !== id));
-		setSelectedAccounts((prev) => prev.filter((a) => a !== id));
+		try {
+			await accounts.disconnect(id);
+			setSocialAccounts((prev) => prev.filter((a) => a.id !== id));
+			setSelectedAccounts((prev) => prev.filter((a) => a !== id));
+		} catch (err) {
+			alert(err instanceof Error ? err.message : "Failed to disconnect");
+		}
 	}
 
 	async function handleSchedulePost(e: React.FormEvent) {
