@@ -32,9 +32,46 @@ export const passwordResetTokenTable = sqliteTable("password_reset_token", {
 	expires: integer("expires").notNull(),
 });
 
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+export const organizationTable = sqliteTable("organization", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull(),
+	createdAt: integer("created_at").notNull(),
+	updatedAt: integer("updated_at").notNull(),
+});
+
+export const organizationMemberTable = sqliteTable("organization_member", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	orgId: text("org_id").notNull().references(() => organizationTable.id),
+	userId: text("user_id", { length: 15 }).notNull().references(() => userTable.id),
+	role: text("role").notNull().default("member"),
+	createdAt: integer("created_at").notNull(),
+}, (table) => [
+	uniqueIndex("idx_org_member_unique").on(table.orgId, table.userId),
+	index("idx_org_member_user").on(table.userId),
+	index("idx_org_member_org").on(table.orgId),
+]);
+
+export const organizationInviteTable = sqliteTable("organization_invite", {
+	id: text("id").primaryKey(),
+	orgId: text("org_id").notNull().references(() => organizationTable.id),
+	email: text("email").notNull(),
+	role: text("role").notNull().default("member"),
+	invitedBy: text("invited_by").notNull().references(() => userTable.id),
+	expires: integer("expires").notNull(),
+	createdAt: integer("created_at").notNull(),
+}, (table) => [
+	index("idx_org_invite_email").on(table.email),
+	uniqueIndex("idx_org_invite_unique").on(table.orgId, table.email),
+]);
+
+// ─── Social Accounts & Posts (org-scoped) ────────────────────────────────────
+
 export const socialAccountTable = sqliteTable("social_account", {
 	id: text("id").primaryKey(),
 	userId: text("user_id", { length: 15 }).notNull().references(() => userTable.id),
+	orgId: text("org_id").references(() => organizationTable.id),
 	platform: text("platform").notNull(),
 	platformAccountId: text("platform_account_id").notNull(),
 	platformUsername: text("platform_username"),
@@ -44,12 +81,14 @@ export const socialAccountTable = sqliteTable("social_account", {
 	createdAt: integer("created_at").notNull(),
 }, (table) => [
 	index("idx_social_user").on(table.userId),
+	index("idx_social_org").on(table.orgId),
 	uniqueIndex("idx_social_platform_account").on(table.userId, table.platform, table.platformAccountId),
 ]);
 
 export const postTable = sqliteTable("post", {
 	id: text("id").primaryKey(),
 	userId: text("user_id", { length: 15 }).notNull().references(() => userTable.id),
+	orgId: text("org_id").references(() => organizationTable.id),
 	content: text("content").notNull(),
 	mediaUrls: text("media_urls"),
 	scheduledAt: integer("scheduled_at").notNull(),
@@ -59,6 +98,7 @@ export const postTable = sqliteTable("post", {
 	updatedAt: integer("updated_at").notNull(),
 }, (table) => [
 	index("idx_post_user").on(table.userId),
+	index("idx_post_org").on(table.orgId),
 	index("idx_post_status").on(table.status),
 	index("idx_post_scheduled").on(table.scheduledAt),
 ]);

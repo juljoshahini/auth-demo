@@ -71,10 +71,9 @@ export const connectAccountSchema = z.discriminatedUnion("platform", [
 ]);
 
 export async function listAccounts(c: Context<AppEnv>) {
-	const user = c.get("user");
-	if (!user) return c.json({ error: "Unauthorized" }, 401);
-
+	const org = c.get("org")!;
 	const db = c.get("db");
+
 	const accounts = await db
 		.select({
 			id: socialAccountTable.id,
@@ -84,14 +83,20 @@ export async function listAccounts(c: Context<AppEnv>) {
 			createdAt: socialAccountTable.createdAt,
 		})
 		.from(socialAccountTable)
-		.where(eq(socialAccountTable.userId, user.userId));
+		.where(eq(socialAccountTable.orgId, org.orgId));
 
 	return c.json({ accounts });
 }
 
 export async function connectAccount(c: Context<AppEnv>) {
-	const user = c.get("user");
-	if (!user) return c.json({ error: "Unauthorized" }, 401);
+	const ability = c.get("ability")!;
+	if (!ability.can("create", "SocialAccount")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+
+	const user = c.get("user")!;
+	const org = c.get("org")!;
+	const db = c.get("db");
 
 	const body = await c.req.json();
 	const result = connectAccountSchema.safeParse(body);
@@ -100,7 +105,6 @@ export async function connectAccount(c: Context<AppEnv>) {
 	}
 
 	const data = result.data;
-	const db = c.get("db");
 	const now = Math.floor(Date.now() / 1000);
 
 	try {
@@ -110,6 +114,7 @@ export async function connectAccount(c: Context<AppEnv>) {
 			await db.insert(socialAccountTable).values({
 				id: nanoid(),
 				userId: user.userId,
+				orgId: org.orgId,
 				platform: "bluesky",
 				platformAccountId: did,
 				platformUsername: handle,
@@ -124,6 +129,7 @@ export async function connectAccount(c: Context<AppEnv>) {
 		await db.insert(socialAccountTable).values({
 			id: nanoid(),
 			userId: user.userId,
+			orgId: org.orgId,
 			platform: data.platform,
 			platformAccountId: data.platformAccountId,
 			platformUsername: data.platformUsername ?? null,
@@ -149,16 +155,19 @@ export async function connectAccount(c: Context<AppEnv>) {
 }
 
 export async function disconnectAccount(c: Context<AppEnv>) {
-	const user = c.get("user");
-	if (!user) return c.json({ error: "Unauthorized" }, 401);
+	const ability = c.get("ability")!;
+	if (!ability.can("delete", "SocialAccount")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
 
+	const org = c.get("org")!;
 	const id = c.req.param("id")!;
 	const db = c.get("db");
 
 	const [account] = await db
 		.select({ id: socialAccountTable.id })
 		.from(socialAccountTable)
-		.where(and(eq(socialAccountTable.id, id), eq(socialAccountTable.userId, user.userId)));
+		.where(and(eq(socialAccountTable.id, id), eq(socialAccountTable.orgId, org.orgId)));
 
 	if (!account) {
 		return c.json({ error: "Account not found" }, 404);
@@ -191,7 +200,7 @@ export async function disconnectAccount(c: Context<AppEnv>) {
 
 	await db
 		.delete(socialAccountTable)
-		.where(and(eq(socialAccountTable.id, id), eq(socialAccountTable.userId, user.userId)));
+		.where(and(eq(socialAccountTable.id, id), eq(socialAccountTable.orgId, org.orgId)));
 
 	return c.json({ success: true });
 }

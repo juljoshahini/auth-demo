@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { withDb, withLucia, withUser, requireAuth } from "./middleware";
+import { withDb, withLucia, withUser, requireAuth, withOrg, requireOrg } from "./middleware";
 import * as AuthController from "./controllers/AuthController";
 import * as PostController from "./controllers/PostController";
 import * as SocialAccountController from "./controllers/SocialAccountController";
+import * as OrgController from "./controllers/OrgController";
 import type { AppEnv } from "./types";
 
 const app = new Hono<AppEnv>().basePath("/api");
@@ -17,6 +18,7 @@ app.use("*", async (c, next) => {
 
 const pub = [withDb, withLucia] as const;
 const authed = [withDb, withLucia, withUser, requireAuth] as const;
+const orgScoped = [withDb, withLucia, withUser, requireAuth, withOrg, requireOrg] as const;
 
 // Auth (public)
 app.post("/auth/signup", ...pub, AuthController.signup);
@@ -38,17 +40,28 @@ app.post("/auth/logout", ...authed, AuthController.logout);
 app.post("/auth/verify-email", ...authed, AuthController.verifyEmail);
 app.post("/auth/resend-verification", ...authed, AuthController.resendVerification);
 
-// Social Accounts
-app.get("/accounts", ...authed, SocialAccountController.listAccounts);
-app.post("/accounts/connect", ...authed, SocialAccountController.connectAccount);
-app.delete("/accounts/:id", ...authed, SocialAccountController.disconnectAccount);
+// Organizations
+app.post("/orgs", ...authed, OrgController.createOrg);
+app.get("/orgs", ...authed, OrgController.listOrgs);
+app.get("/orgs/current", ...orgScoped, OrgController.getOrg);
+app.put("/orgs/current", ...orgScoped, OrgController.updateOrg);
+app.post("/orgs/current/invite", ...orgScoped, OrgController.inviteMember);
+app.get("/orgs/current/invites", ...orgScoped, OrgController.listInvites);
+app.delete("/orgs/current/members/:userId", ...orgScoped, OrgController.removeMember);
+app.get("/invites", ...authed, OrgController.myPendingInvites);
+app.post("/invites/:inviteId/accept", ...authed, OrgController.acceptInvite);
 
-// Posts
-app.post("/posts", ...authed, PostController.createPost);
-app.get("/posts", ...authed, PostController.listPosts);
-app.get("/posts/:id", ...authed, PostController.getPost);
-app.put("/posts/:id", ...authed, PostController.updatePost);
-app.post("/posts/:id/cancel", ...authed, PostController.cancelPost);
-app.delete("/posts/:id", ...authed, PostController.deletePost);
+// Social Accounts (org-scoped)
+app.get("/accounts", ...orgScoped, SocialAccountController.listAccounts);
+app.post("/accounts/connect", ...orgScoped, SocialAccountController.connectAccount);
+app.delete("/accounts/:id", ...orgScoped, SocialAccountController.disconnectAccount);
+
+// Posts (org-scoped)
+app.post("/posts", ...orgScoped, PostController.createPost);
+app.get("/posts", ...orgScoped, PostController.listPosts);
+app.get("/posts/:id", ...orgScoped, PostController.getPost);
+app.put("/posts/:id", ...orgScoped, PostController.updatePost);
+app.post("/posts/:id/cancel", ...orgScoped, PostController.cancelPost);
+app.delete("/posts/:id", ...orgScoped, PostController.deletePost);
 
 export default app;

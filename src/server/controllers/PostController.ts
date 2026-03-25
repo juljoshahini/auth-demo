@@ -19,7 +19,13 @@ function nanoid(len = 21): string {
 }
 
 export async function createPost(c: Context<AppEnv>) {
+	const ability = c.get("ability")!;
+	if (!ability.can("create", "Post")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+
 	const user = c.get("user")!;
+	const org = c.get("org")!;
 	const db = c.get("db");
 	const body = await c.req.json<{
 		content: string;
@@ -40,19 +46,16 @@ export async function createPost(c: Context<AppEnv>) {
 		return c.json({ error: "At least one social account is required" }, 400);
 	}
 
+	// Verify social accounts belong to this org
 	const accounts = await db
 		.select()
 		.from(socialAccountTable)
-		.where(
-			and(
-				eq(socialAccountTable.userId, user.userId),
-			),
-		);
+		.where(eq(socialAccountTable.orgId, org.orgId));
 
 	const accountIds = new Set(accounts.map((a) => a.id));
 	for (const id of body.socialAccountIds) {
 		if (!accountIds.has(id)) {
-			return c.json({ error: `Social account ${id} not found or does not belong to you` }, 403);
+			return c.json({ error: `Social account ${id} not found in this organization` }, 403);
 		}
 	}
 
@@ -66,6 +69,7 @@ export async function createPost(c: Context<AppEnv>) {
 	await db.insert(postTable).values({
 		id: postId,
 		userId: user.userId,
+		orgId: org.orgId,
 		content: body.content.trim(),
 		mediaUrls: body.mediaUrls ? JSON.stringify(body.mediaUrls) : null,
 		scheduledAt: body.scheduledAt,
@@ -87,14 +91,14 @@ export async function createPost(c: Context<AppEnv>) {
 }
 
 export async function listPosts(c: Context<AppEnv>) {
-	const user = c.get("user")!;
+	const org = c.get("org")!;
 	const db = c.get("db");
 
 	const status = c.req.query("status");
 	const limit = Math.min(parseInt(c.req.query("limit") || "50", 10) || 50, 100);
 	const offset = parseInt(c.req.query("offset") || "0", 10) || 0;
 
-	const conditions = [eq(postTable.userId, user.userId)];
+	const conditions = [eq(postTable.orgId, org.orgId)];
 	if (status) {
 		conditions.push(eq(postTable.status, status));
 	}
@@ -111,14 +115,14 @@ export async function listPosts(c: Context<AppEnv>) {
 }
 
 export async function getPost(c: Context<AppEnv>) {
-	const user = c.get("user")!;
+	const org = c.get("org")!;
 	const db = c.get("db");
 	const postId = c.req.param("id")!;
 
 	const [post] = await db
 		.select()
 		.from(postTable)
-		.where(and(eq(postTable.id, postId), eq(postTable.userId, user.userId)));
+		.where(and(eq(postTable.id, postId), eq(postTable.orgId, org.orgId)));
 
 	if (!post) {
 		return c.json({ error: "Post not found" }, 404);
@@ -143,14 +147,19 @@ export async function getPost(c: Context<AppEnv>) {
 }
 
 export async function updatePost(c: Context<AppEnv>) {
-	const user = c.get("user")!;
+	const ability = c.get("ability")!;
+	if (!ability.can("update", "Post")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+
+	const org = c.get("org")!;
 	const db = c.get("db");
 	const postId = c.req.param("id")!;
 
 	const [existing] = await db
 		.select()
 		.from(postTable)
-		.where(and(eq(postTable.id, postId), eq(postTable.userId, user.userId)));
+		.where(and(eq(postTable.id, postId), eq(postTable.orgId, org.orgId)));
 
 	if (!existing) {
 		return c.json({ error: "Post not found" }, 404);
@@ -200,12 +209,12 @@ export async function updatePost(c: Context<AppEnv>) {
 		const accounts = await db
 			.select()
 			.from(socialAccountTable)
-			.where(eq(socialAccountTable.userId, user.userId));
+			.where(eq(socialAccountTable.orgId, org.orgId));
 
 		const accountIds = new Set(accounts.map((a) => a.id));
 		for (const id of body.socialAccountIds) {
 			if (!accountIds.has(id)) {
-				return c.json({ error: `Social account ${id} not found or does not belong to you` }, 403);
+				return c.json({ error: `Social account ${id} not found in this organization` }, 403);
 			}
 		}
 
@@ -226,14 +235,19 @@ export async function updatePost(c: Context<AppEnv>) {
 }
 
 export async function cancelPost(c: Context<AppEnv>) {
-	const user = c.get("user")!;
+	const ability = c.get("ability")!;
+	if (!ability.can("update", "Post")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+
+	const org = c.get("org")!;
 	const db = c.get("db");
 	const postId = c.req.param("id")!;
 
 	const [post] = await db
 		.select()
 		.from(postTable)
-		.where(and(eq(postTable.id, postId), eq(postTable.userId, user.userId)));
+		.where(and(eq(postTable.id, postId), eq(postTable.orgId, org.orgId)));
 
 	if (!post) {
 		return c.json({ error: "Post not found" }, 404);
@@ -257,14 +271,19 @@ export async function cancelPost(c: Context<AppEnv>) {
 }
 
 export async function deletePost(c: Context<AppEnv>) {
-	const user = c.get("user")!;
+	const ability = c.get("ability")!;
+	if (!ability.can("delete", "Post")) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+
+	const org = c.get("org")!;
 	const db = c.get("db");
 	const postId = c.req.param("id")!;
 
 	const [post] = await db
 		.select()
 		.from(postTable)
-		.where(and(eq(postTable.id, postId), eq(postTable.userId, user.userId)));
+		.where(and(eq(postTable.id, postId), eq(postTable.orgId, org.orgId)));
 
 	if (!post) {
 		return c.json({ error: "Post not found" }, 404);

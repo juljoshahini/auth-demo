@@ -5,7 +5,7 @@ import { isWithinExpiration } from "lucia/utils";
 import { google } from "@lucia-auth/oauth/providers";
 import { github } from "@lucia-auth/oauth/providers";
 import { discord } from "@lucia-auth/oauth/providers";
-import { userTable, emailVerificationCodeTable } from "../db/schema";
+import { userTable, emailVerificationCodeTable, organizationTable, organizationMemberTable } from "../db/schema";
 import { isValidEmail } from "../helpers/validation";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../helpers/email";
 import {
@@ -14,6 +14,33 @@ import {
 	validatePasswordResetToken,
 } from "../helpers/tokens";
 import type { AppEnv } from "../types";
+
+function nanoid(len = 21): string {
+	const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+	const bytes = crypto.getRandomValues(new Uint8Array(len));
+	let id = "";
+	for (let i = 0; i < len; i++) {
+		id += alphabet[bytes[i] % alphabet.length];
+	}
+	return id;
+}
+
+async function createPersonalOrg(db: any, userId: string, email: string) {
+	const orgId = nanoid();
+	const now = Date.now();
+	await db.insert(organizationTable).values({
+		id: orgId,
+		name: `${email.split("@")[0]}'s Team`,
+		createdAt: now,
+		updatedAt: now,
+	});
+	await db.insert(organizationMemberTable).values({
+		orgId,
+		userId,
+		role: "owner",
+		createdAt: now,
+	});
+}
 
 function parseCookie(cookieHeader: string | null, name: string): string | undefined {
 	if (!cookieHeader) return undefined;
@@ -46,6 +73,9 @@ export async function signup(c: Context<AppEnv>) {
 				email_verified: 0,
 			},
 		});
+
+		// Auto-create personal organization
+		await createPersonalOrg(db, user.userId, email);
 
 		const code = await generateEmailVerificationCode(db, user.userId);
 		await sendVerificationEmail(email, code);
@@ -266,6 +296,7 @@ export async function googleCallback(c: Context<AppEnv>) {
 						email_verified: 1,
 					},
 				});
+				await createPersonalOrg(db, user.userId, googleUser.email!);
 			}
 		}
 
@@ -335,12 +366,14 @@ export async function githubCallback(c: Context<AppEnv>) {
 			}
 
 			if (!user) {
+				const userEmail = email ?? `${githubUser.login}@github.noreply`;
 				user = await createUser({
 					attributes: {
-						email: email ?? `${githubUser.login}@github.noreply`,
+						email: userEmail,
 						email_verified: email ? 1 : 0,
 					},
 				});
+				await createPersonalOrg(db, user.userId, userEmail);
 			}
 		}
 
@@ -414,12 +447,14 @@ export async function discordCallback(c: Context<AppEnv>) {
 			}
 
 			if (!user) {
+				const userEmail = email ?? `${discordUser.username}@discord.noreply`;
 				user = await createUser({
 					attributes: {
-						email: email ?? `${discordUser.username}@discord.noreply`,
+						email: userEmail,
 						email_verified: email && discordUser.verified ? 1 : 0,
 					},
 				});
+				await createPersonalOrg(db, user.userId, userEmail);
 			}
 		}
 

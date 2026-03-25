@@ -1,11 +1,23 @@
+let currentOrgId: string | null = null;
+
+export function setCurrentOrg(orgId: string | null) {
+	currentOrgId = orgId;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		...options?.headers as Record<string, string>,
+	};
+
+	if (currentOrgId) {
+		headers["X-Org-Id"] = currentOrgId;
+	}
+
 	const res = await fetch(`/api${path}`, {
 		...options,
 		credentials: "include",
-		headers: {
-			"Content-Type": "application/json",
-			...options?.headers,
-		},
+		headers,
 	});
 
 	const data = await res.json();
@@ -45,6 +57,51 @@ export const auth = {
 
 	resendVerification: () =>
 		request<{ message: string }>("/auth/resend-verification", { method: "POST" }),
+};
+
+// Organizations
+export const orgs = {
+	list: () =>
+		request<{ organizations: Array<{ orgId: string; role: string; name: string; createdAt: number }> }>("/orgs"),
+
+	create: (name: string) =>
+		request<{ org: { id: string; name: string } }>("/orgs", {
+			method: "POST",
+			body: JSON.stringify({ name }),
+		}),
+
+	get: () =>
+		request<{
+			org: { id: string; name: string; createdAt: number };
+			members: Array<{ userId: string; role: string; email: string; joinedAt: number }>;
+		}>("/orgs/current"),
+
+	update: (name: string) =>
+		request<{ success: boolean }>("/orgs/current", {
+			method: "PUT",
+			body: JSON.stringify({ name }),
+		}),
+
+	invite: (email: string, role?: string) =>
+		request<{ invite: { id: string; email: string; role: string; expires: number } }>("/orgs/current/invite", {
+			method: "POST",
+			body: JSON.stringify({ email, role }),
+		}),
+
+	listInvites: () =>
+		request<{ invites: Array<{ id: string; email: string; role: string; expires: number }> }>("/orgs/current/invites"),
+
+	removeMember: (userId: string) =>
+		request<{ success: boolean }>(`/orgs/current/members/${userId}`, { method: "DELETE" }),
+};
+
+// Invites (user-level)
+export const invites = {
+	list: () =>
+		request<{ invites: Array<{ id: string; orgId: string; orgName: string; role: string; expires: number }> }>("/invites"),
+
+	accept: (inviteId: string) =>
+		request<{ success: boolean; orgId: string }>(`/invites/${inviteId}/accept`, { method: "POST" }),
 };
 
 // Social Accounts
