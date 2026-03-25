@@ -23,6 +23,7 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
@@ -282,16 +283,17 @@ export default function DashboardPage() {
 								<Badge variant="outline" className="text-xs font-normal">{currentOrg?.role}</Badge>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="start">
-								<DropdownMenuLabel>Organizations</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								{userOrgs.map((org) => (
-									<DropdownMenuItem key={org.orgId} onClick={() => switchOrg(org)}>
-										<span className="flex-1">{org.name}</span>
-										{org.orgId === currentOrg?.orgId && (
-											<Badge variant="secondary" className="ml-2 text-xs">current</Badge>
-										)}
-									</DropdownMenuItem>
-								))}
+								<DropdownMenuGroup>
+									<DropdownMenuLabel>Organizations</DropdownMenuLabel>
+									{userOrgs.map((org) => (
+										<DropdownMenuItem key={org.orgId} onClick={() => switchOrg(org)}>
+											<span className="flex-1">{org.name}</span>
+											{org.orgId === currentOrg?.orgId && (
+												<Badge variant="secondary" className="ml-2 text-xs">current</Badge>
+											)}
+										</DropdownMenuItem>
+									))}
+								</DropdownMenuGroup>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem onClick={() => setOrgDialogOpen(true)}>
 									+ New organization
