@@ -6,6 +6,7 @@ import { google } from "@lucia-auth/oauth/providers";
 import { github } from "@lucia-auth/oauth/providers";
 import { discord } from "@lucia-auth/oauth/providers";
 import { userTable, emailVerificationCodeTable, organizationTable, organizationMemberTable } from "../db/schema";
+import type { Database } from "../db";
 import { isValidEmail } from "../helpers/validation";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../helpers/email";
 import {
@@ -25,7 +26,7 @@ function nanoid(len = 21): string {
 	return id;
 }
 
-async function createPersonalOrg(db: any, userId: string, email: string) {
+async function createPersonalOrg(db: Database, userId: string, email: string) {
 	const orgId = nanoid();
 	const now = Date.now();
 	await db.insert(organizationTable).values({
