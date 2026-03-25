@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LoginPage() {
 	const router = useRouter();
@@ -29,51 +33,52 @@ export default function LoginPage() {
 
 	return (
 		<main className="flex items-center justify-center min-h-screen p-4">
-			<div className="w-full max-w-sm space-y-6">
-				<div className="text-center">
-					<h1 className="text-2xl font-bold">Log in</h1>
-					<p className="text-gray-500 mt-1">Welcome back</p>
-				</div>
-
-				<form onSubmit={handleSubmit} className="space-y-4">
-					{error && (
-						<div className="p-3 text-sm text-red-700 bg-red-50 rounded-lg">{error}</div>
-					)}
-
-					<input
-						type="email"
-						placeholder="Email"
-						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						required
-						className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-					/>
-
-					<input
-						type="password"
-						placeholder="Password"
-						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						required
-						className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
-					/>
-
-					<button
-						type="submit"
-						disabled={loading}
-						className="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition"
-					>
-						{loading ? "Logging in..." : "Log in"}
-					</button>
-				</form>
-
-				<p className="text-center text-sm text-gray-500">
-					Don&apos;t have an account?{" "}
-					<Link href="/signup" className="text-gray-900 underline">
-						Sign up
-					</Link>
-				</p>
-			</div>
+			<Card className="w-full max-w-sm">
+				<CardHeader className="text-center">
+					<CardTitle className="text-2xl">Log in</CardTitle>
+					<CardDescription>Welcome back</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						{error && (
+							<div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>
+						)}
+						<div className="space-y-2">
+							<Label htmlFor="email">Email</Label>
+							<Input
+								id="email"
+								type="email"
+								placeholder="you@example.com"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								required
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="password">Password</Label>
+							<Input
+								id="password"
+								type="password"
+								placeholder="Password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								required
+							/>
+						</div>
+						<Button type="submit" className="w-full" disabled={loading}>
+							{loading ? "Logging in..." : "Log in"}
+						</Button>
+					</form>
+				</CardContent>
+				<CardFooter className="justify-center">
+					<p className="text-sm text-muted-foreground">
+						Don&apos;t have an account?{" "}
+						<Link href="/signup" className="text-foreground underline underline-offset-4 hover:text-primary">
+							Sign up
+						</Link>
+					</p>
+				</CardFooter>
+			</Card>
 		</main>
 	);
 }
