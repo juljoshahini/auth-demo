@@ -21,7 +21,8 @@ export async function publishToTumblr(
 		});
 	}
 
-	const res = await fetch(`${TUMBLR_API}/blog/${blogName}/posts`, {
+	const blogIdentifier = blogName.includes(".") ? blogName : `${blogName}.tumblr.com`;
+	const res = await fetch(`${TUMBLR_API}/blog/${blogIdentifier}/posts`, {
 		method: "POST",
 		headers: {
 			Authorization: `Bearer ${accessToken}`,
