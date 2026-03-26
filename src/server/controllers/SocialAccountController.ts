@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { eq, and, inArray } from "drizzle-orm";
 import { socialAccountTable, postTargetTable, postTable } from "../db/schema";
 import { verifyCredentials } from "../platforms/bluesky";
+import { verifyTumblrToken } from "../platforms/tumblr";
 import type { AppEnv } from "../types";
 
 function nanoid(len = 21): string {
@@ -61,6 +62,11 @@ const tiktokSchema = z.object({
 	platformUsername: z.string().optional(),
 });
 
+const tumblrSchema = z.object({
+	platform: z.literal("tumblr"),
+	accessToken: z.string().min(1),
+});
+
 export const connectAccountSchema = z.discriminatedUnion("platform", [
 	blueskySchema,
 	twitterSchema,
@@ -68,6 +74,7 @@ export const connectAccountSchema = z.discriminatedUnion("platform", [
 	linkedinSchema,
 	facebookSchema,
 	tiktokSchema,
+	tumblrSchema,
 ]);
 
 export async function listAccounts(c: Context<AppEnv>) {
@@ -125,6 +132,23 @@ export async function connectAccount(c: Context<AppEnv>) {
 			return c.json({ success: true, platform: "bluesky", platformAccountId: did, platformUsername: handle });
 		}
 
+		if (data.platform === "tumblr") {
+			const { blogName, blogUuid } = await verifyTumblrToken(data.accessToken);
+
+			await db.insert(socialAccountTable).values({
+				id: nanoid(),
+				userId: user.userId,
+				orgId: org.orgId,
+				platform: "tumblr",
+				platformAccountId: blogUuid,
+				platformUsername: blogName,
+				accessToken: `${blogName}:::${data.accessToken}`,
+				createdAt: now,
+			});
+
+			return c.json({ success: true, platform: "tumblr", platformAccountId: blogUuid, platformUsername: blogName });
+		}
+
 		// Generic OAuth-based platforms
 		await db.insert(socialAccountTable).values({
 			id: nanoid(),
@@ -151,6 +175,94 @@ export async function connectAccount(c: Context<AppEnv>) {
 			return c.json({ error: "This account is already connected" }, 409);
 		}
 		throw err;
+	}
+}
+
+// ─── Tumblr OAuth2 Connect (for posting, not login) ─────────────────────────
+
+export async function tumblrConnect(c: Context<AppEnv>) {
+	const origin = new URL(c.req.url).origin;
+	const state = nanoid(32);
+
+	const params = new URLSearchParams({
+		client_id: "7ix2naYPBg152RWc987UgpXrD4rkOeTqp56g5FModyfyUq03pC",
+		redirect_uri: `${origin}/api/accounts/tumblr/callback`,
+		response_type: "code",
+		scope: "basic write",
+		state,
+	});
+
+	c.header("Set-Cookie", `tumblr_connect_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+	return c.redirect(`https://www.tumblr.com/oauth2/authorize?${params.toString()}`);
+}
+
+export async function tumblrCallback(c: Context<AppEnv>) {
+	const user = c.get("user")!;
+	const org = c.get("org")!;
+	const db = c.get("db");
+	const origin = new URL(c.req.url).origin;
+
+	const cookieHeader = c.req.header("Cookie") ?? null;
+	const storedState = cookieHeader?.match(/(?:^|;\s*)tumblr_connect_state=([^;]*)/)?.[1];
+	const url = new URL(c.req.url);
+	const state = url.searchParams.get("state");
+	const code = url.searchParams.get("code");
+
+	if (!storedState || !state || storedState !== state || !code) {
+		return c.redirect("/dashboard?error=tumblr_invalid_state");
+	}
+
+	try {
+		// Exchange code for access token
+		const tokenRes = await fetch("https://api.tumblr.com/v2/oauth2/token", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				grant_type: "authorization_code",
+				code,
+				client_id: "7ix2naYPBg152RWc987UgpXrD4rkOeTqp56g5FModyfyUq03pC",
+				client_secret: "9GyUTIak15Sl1gybDs2ktStfNfCDMF4WPf87oBjRg4N3yk0rDA",
+				redirect_uri: `${origin}/api/accounts/tumblr/callback`,
+			}),
+		});
+
+		if (!tokenRes.ok) {
+			console.error("Tumblr token exchange failed:", await tokenRes.text());
+			return c.redirect("/dashboard?error=tumblr_token_failed");
+		}
+
+		const tokenData = await tokenRes.json() as {
+			access_token: string;
+			refresh_token?: string;
+			expires_in?: number;
+		};
+
+		// Verify token and get blog info
+		const { blogName, blogUuid } = await verifyTumblrToken(tokenData.access_token);
+
+		await db.insert(socialAccountTable).values({
+			id: nanoid(),
+			userId: user.userId,
+			orgId: org.orgId,
+			platform: "tumblr",
+			platformAccountId: blogUuid,
+			platformUsername: blogName,
+			accessToken: `${blogName}:::${tokenData.access_token}`,
+			refreshToken: tokenData.refresh_token ?? null,
+			tokenExpiresAt: tokenData.expires_in
+				? Math.floor(Date.now() / 1000) + tokenData.expires_in
+				: null,
+			createdAt: Math.floor(Date.now() / 1000),
+		});
+
+		return c.redirect("/dashboard?tumblr=connected");
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		if (message.includes("UNIQUE")) {
+			return c.redirect("/dashboard?error=tumblr_already_connected");
+		}
+		console.error("Tumblr connect error:", err);
+		return c.redirect("/dashboard?error=tumblr_failed");
 	}
 }
 

@@ -54,6 +54,8 @@ app.post("/invites/:inviteId/accept", ...authed, OrgController.acceptInvite);
 // Social Accounts (org-scoped)
 app.get("/accounts", ...orgScoped, SocialAccountController.listAccounts);
 app.post("/accounts/connect", ...orgScoped, SocialAccountController.connectAccount);
+app.get("/accounts/tumblr/connect", ...orgScoped, SocialAccountController.tumblrConnect);
+app.get("/accounts/tumblr/callback", ...orgScoped, SocialAccountController.tumblrCallback);
 app.delete("/accounts/:id", ...orgScoped, SocialAccountController.disconnectAccount);
 
 // Posts (org-scoped)

@@ -56,6 +56,7 @@ export default function DashboardPage() {
 	const [connectError, setConnectError] = useState("");
 	const [connecting, setConnecting] = useState(false);
 
+
 	// New post form
 	const [postContent, setPostContent] = useState("");
 	const [postDate, setPostDate] = useState("");
@@ -484,6 +485,18 @@ export default function DashboardPage() {
 										{connecting ? "Connecting..." : "Connect"}
 									</Button>
 								</form>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader>
+								<CardTitle>Connect Tumblr</CardTitle>
+								<CardDescription>Authorize with Tumblr to schedule posts to your blog</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<Button onClick={() => { window.location.href = "/api/accounts/tumblr/connect"; }}>
+									Connect Tumblr
+								</Button>
 							</CardContent>
 						</Card>
 					</TabsContent>

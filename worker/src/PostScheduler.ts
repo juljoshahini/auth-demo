@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import { postTable, postTargetTable, socialAccountTable } from "./schema";
 import { publishToBluesky } from "./bluesky";
+import { publishToTumblr } from "./tumblr";
 
 interface Env {
 	DB: D1Database;
@@ -96,6 +97,12 @@ export class PostScheduler extends DurableObject<Env> {
 				if (!identifier || !appPassword) throw new Error("Invalid Bluesky credentials");
 				const result = await publishToBluesky({ identifier, appPassword }, content, mediaUrls);
 				return result.uri;
+			}
+			case "tumblr": {
+				const [blogName, token] = accessToken.split(":::");
+				if (!blogName || !token) throw new Error("Invalid Tumblr credentials");
+				const result = await publishToTumblr(token, blogName, content, mediaUrls);
+				return result.id;
 			}
 			default:
 				throw new Error(`Platform "${platform}" not yet implemented`);
