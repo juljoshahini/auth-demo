@@ -4,6 +4,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { socialAccountTable, postTargetTable, postTable } from "../db/schema";
 import { verifyCredentials } from "../platforms/bluesky";
 import { verifyTumblrToken } from "../platforms/tumblr";
+import { verifyMastodonCredentials } from "../platforms/mastodon";
 import type { AppEnv } from "../types";
 
 function nanoid(len = 21): string {
@@ -67,6 +68,12 @@ const tumblrSchema = z.object({
 	accessToken: z.string().min(1),
 });
 
+const mastodonSchema = z.object({
+	platform: z.literal("mastodon"),
+	instanceUrl: z.string().url().min(1),
+	accessToken: z.string().min(1),
+});
+
 export const connectAccountSchema = z.discriminatedUnion("platform", [
 	blueskySchema,
 	twitterSchema,
@@ -75,6 +82,7 @@ export const connectAccountSchema = z.discriminatedUnion("platform", [
 	facebookSchema,
 	tiktokSchema,
 	tumblrSchema,
+	mastodonSchema,
 ]);
 
 export async function listAccounts(c: Context<AppEnv>) {
@@ -130,6 +138,24 @@ export async function connectAccount(c: Context<AppEnv>) {
 			});
 
 			return c.json({ success: true, platform: "bluesky", platformAccountId: did, platformUsername: handle });
+		}
+
+		if (data.platform === "mastodon") {
+			const instanceUrl = data.instanceUrl.replace(/\/+$/, "");
+			const { id: mastodonId, username } = await verifyMastodonCredentials(instanceUrl, data.accessToken);
+
+			await db.insert(socialAccountTable).values({
+				id: nanoid(),
+				userId: user.userId,
+				orgId: org.orgId,
+				platform: "mastodon",
+				platformAccountId: mastodonId,
+				platformUsername: `@${username}@${new URL(instanceUrl).hostname}`,
+				accessToken: `${instanceUrl}:::${data.accessToken}`,
+				createdAt: now,
+			});
+
+			return c.json({ success: true, platform: "mastodon", platformAccountId: mastodonId, platformUsername: `@${username}@${new URL(instanceUrl).hostname}` });
 		}
 
 		if (data.platform === "tumblr") {

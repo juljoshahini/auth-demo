@@ -56,6 +56,11 @@ export default function DashboardPage() {
 	const [connectError, setConnectError] = useState("");
 	const [connecting, setConnecting] = useState(false);
 
+	// Connect Mastodon form
+	const [mastodonInstance, setMastodonInstance] = useState("https://mastodon.social");
+	const [mastodonToken, setMastodonToken] = useState("");
+	const [mastodonError, setMastodonError] = useState("");
+	const [mastodonConnecting, setMastodonConnecting] = useState(false);
 
 	// New post form
 	const [postContent, setPostContent] = useState("");
@@ -181,6 +186,22 @@ export default function DashboardPage() {
 			setConnectError(err instanceof Error ? err.message : "Failed to connect");
 		} finally {
 			setConnecting(false);
+		}
+	}
+
+	async function handleConnectMastodon(e: React.FormEvent) {
+		e.preventDefault();
+		setMastodonError("");
+		setMastodonConnecting(true);
+		try {
+			await accounts.connect({ platform: "mastodon", instanceUrl: mastodonInstance, accessToken: mastodonToken });
+			setMastodonToken("");
+			const res = await accounts.list();
+			setSocialAccounts(res.accounts);
+		} catch (err) {
+			setMastodonError(err instanceof Error ? err.message : "Failed to connect");
+		} finally {
+			setMastodonConnecting(false);
 		}
 	}
 
@@ -497,6 +518,31 @@ export default function DashboardPage() {
 								<Button onClick={() => { window.location.href = "/api/accounts/tumblr/connect"; }}>
 									Connect Tumblr
 								</Button>
+							</CardContent>
+						</Card>
+
+						<Card>
+							<CardHeader>
+								<CardTitle>Connect Mastodon</CardTitle>
+								<CardDescription>Use your instance URL and an access token from Preferences &gt; Development &gt; New Application</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<form onSubmit={handleConnectMastodon} className="space-y-4">
+									{mastodonError && (
+										<div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{mastodonError}</div>
+									)}
+									<div className="space-y-2">
+										<Label htmlFor="mastodon-instance">Instance URL</Label>
+										<Input id="mastodon-instance" placeholder="https://mastodon.social" value={mastodonInstance} onChange={(e) => setMastodonInstance(e.target.value)} required />
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="mastodon-token">Access Token</Label>
+										<Input id="mastodon-token" type="password" placeholder="Your access token" value={mastodonToken} onChange={(e) => setMastodonToken(e.target.value)} required />
+									</div>
+									<Button type="submit" disabled={mastodonConnecting}>
+										{mastodonConnecting ? "Connecting..." : "Connect"}
+									</Button>
+								</form>
 							</CardContent>
 						</Card>
 					</TabsContent>

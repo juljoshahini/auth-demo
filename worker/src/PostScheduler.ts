@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { postTable, postTargetTable, socialAccountTable } from "./schema";
 import { publishToBluesky } from "./bluesky";
 import { publishToTumblr } from "./tumblr";
+import { publishToMastodon } from "./mastodon";
 
 interface Env {
 	DB: D1Database;
@@ -102,6 +103,12 @@ export class PostScheduler extends DurableObject<Env> {
 				const [blogName, token] = accessToken.split(":::");
 				if (!blogName || !token) throw new Error("Invalid Tumblr credentials");
 				const result = await publishToTumblr(token, blogName, content, mediaUrls);
+				return result.id;
+			}
+			case "mastodon": {
+				const [instanceUrl, token] = accessToken.split(":::");
+				if (!instanceUrl || !token) throw new Error("Invalid Mastodon credentials");
+				const result = await publishToMastodon(instanceUrl, token, content, mediaUrls);
 				return result.id;
 			}
 			default:
