@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "auth-demo",
+	"name": "auth-demo-v2",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2026-03-17",
 	"compatibility_flags": ["nodejs_compat"],
